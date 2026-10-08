@@ -1,0 +1,17 @@
+[package]
+name = "gray-titlebar"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.91"
+license = "MIT"
+description = "Terminal title spinner while the agent works (OSC 2). Port of pi's titlebar-spinner extension."
+
+[[bin]]
+name = "gray-titlebar"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+
+[profile.release]
+strip = true
