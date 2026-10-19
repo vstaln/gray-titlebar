@@ -4,8 +4,9 @@
 //! on a timer; a sidecar can't paint between wire lines, so the title is
 //! event-driven instead: `pre_tool` shows `⬡ gray — <tool>`, `post_tool`
 //! keeps the tool name with a ✓/✗ result mark, and `turn_end` (and
-//! shutdown) restores `⬡ gray — ready`. Titles are OSC 2 written to
-//! /dev/tty — stdout is the JSON wire, never the terminal.
+//! shutdown) restores `⬡ gray — ready`. Titles are OSC 2 written to the
+//! console (/dev/tty on unix, CONOUT$ on Windows) — stdout is the JSON
+//! wire, never the terminal.
 //!
 //! `/titlebar` reports status; `/titlebar on|off` toggles, persisted at
 //! ~/.gray/titlebar/disabled. Headless (no tty) → every write is a no-op.
@@ -42,9 +43,13 @@ fn title_seq(title: &str) -> String {
 /// Write to the controlling terminal, bypassing the NDJSON stdout wire.
 /// Returns false when no tty is reachable (cron runs, `gray -p` subagents).
 fn tty_write(s: &str) -> bool {
+    #[cfg(windows)]
+    const CONSOLE: &str = "CONOUT$";
+    #[cfg(not(windows))]
+    const CONSOLE: &str = "/dev/tty";
     std::fs::OpenOptions::new()
         .write(true)
-        .open("/dev/tty")
+        .open(CONSOLE)
         .and_then(|mut f| f.write_all(s.as_bytes()).and_then(|_| f.flush()))
         .is_ok()
 }
@@ -56,7 +61,7 @@ fn set_title(title: &str) -> bool {
 fn state_dir() -> PathBuf {
     let home = std::env::var_os("GRAY_HOME")
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".gray")))
+        .or_else(|| std::env::home_dir().map(|h| h.join(".gray")))
         .unwrap_or_else(|| PathBuf::from("."));
     home.join("titlebar")
 }
@@ -210,7 +215,9 @@ fn main() -> std::io::Result<()> {
     let mut turn = Turn::default();
     for line in stdin.lock().lines() {
         let line = line?;
-        let Ok(req) = serde_json::from_str::<Value>(&line) else { continue };
+        let Ok(req) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
         let (reply, exit) = handle(&req, &mut turn);
         if let Some(reply) = reply {
             writeln!(stdout, "{reply}")?;
@@ -228,13 +235,17 @@ mod tests {
     use super::*;
 
     fn call(turn: &mut Turn, method: &str, params: Value) -> Value {
-        handle(&json!({ "id": 1, "method": method, "params": params }), turn)
-            .0
-            .unwrap()
+        handle(
+            &json!({ "id": 1, "method": method, "params": params }),
+            turn,
+        )
+        .0
+        .unwrap()
     }
 
     fn tmpdir(tag: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("gray-titlebar-test-{}-{}", std::process::id(), tag));
+        let d =
+            std::env::temp_dir().join(format!("gray-titlebar-test-{}-{}", std::process::id(), tag));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
