@@ -25,7 +25,7 @@ fn manifest() -> Value {
         "version": env!("CARGO_PKG_VERSION"),
         "protocol": "1.1",
         "tools": [],
-        "description": "terminal",
+        "description": "terminal title spinner while the agent works",
         "commands": ["/titlebar"],
     })
 }
