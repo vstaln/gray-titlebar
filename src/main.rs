@@ -27,6 +27,7 @@ fn manifest() -> Value {
         "tools": [],
         "description": "terminal title spinner while the agent works",
         "commands": ["/titlebar"],
+        "command_descriptions": {"/titlebar": "toggle the terminal title status"},
     })
 }
 
